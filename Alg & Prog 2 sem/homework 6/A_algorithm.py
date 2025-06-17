@@ -9,7 +9,7 @@ pygame.init()
 # Константы
 WIDTH = 800
 GRID_SIZE = 10  # Размер поля 10x10
-CELL_SIZE = WIDTH // GRID_SIZE
+CELL_SIZE = WIDTH // GRID_SIZE 
 WIN = pygame.display.set_mode((WIDTH, WIDTH))
 pygame.display.set_caption("A звиоздотька")
 
