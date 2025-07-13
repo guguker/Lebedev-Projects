@@ -37,7 +37,7 @@ class CalculatorApp(ft.Container):
         self.reset()
 
         self.result = ft.Text(value="0", color=ft.Colors.WHITE, size=30)
-        self.width = 500
+        self.width = 400
         self.bgcolor = ft.Colors.PINK
         self.border_radius = ft.border_radius.all(20)
         self.padding = 20
