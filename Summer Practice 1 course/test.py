@@ -51,8 +51,10 @@ def main(page: ft.Page):
     def render_start_screen():
         page.overlay.clear()
         page.clean()
+        
         def on_custom_click(e):
             start_game_handler(e)
+        
         page.add(
             ft.Container(
                         content=ft.Column(

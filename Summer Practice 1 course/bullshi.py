@@ -1,121 +1,45 @@
 import flet as ft
 
-class StyledButton(ft.GestureDetector):
-    def __init__(self):
-        super().__init__()
-        self.mouse_cursor = ft.MouseCursor.CLICK
-        self.content = ft.Container(
-            content=ft.Text(value=""),
-            width=0,
-            height=0,
-            bgcolor=None,
-            border_radius=0,
-            padding=0,
-            alignment=ft.alignment.center
-        )
-
-    def set_text(self, text: str, text_color: str = ft.Colors.WHITE, font_size: int = 16, font_family: str = None):
-        self.content.content.value = text
-        self.content.content.color = text_color
-        self.content.content.size = font_size
-        self.content.content.font_family = font_family
-        return self
-
-    def set_size(self, width: float, height: float, padding: int = 10):
-        self.content.width = width
-        self.content.height = height
-        self.content.padding = padding
-        return self
-
-    def set_style(self, bgcolor: str, border_radius: int = 8):
-        self.content.bgcolor = bgcolor
-        self.content.border_radius = border_radius
-        return self
-
-    def set_action(self, on_click):
-        self.on_tap = on_click
-        return self
 
 def main(page: ft.Page):
-    page.title = "Balance Game"
-    page.window_width = 800
-    page.window_height = 1000
-    page.bgcolor = ft.Colors.DEEP_PURPLE_900
+    page.title = "Игра Найди пары"
+    page.window.width = 600
+    page.window.height = 600
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    print(page.window.width, page.window.height)
 
-    game_paused = False
+    page.add(
+        ft.Stack(  # Используем Stack для наложения элементов
+            controls=[
 
-    def start_game_handler(e):
-        page.clean()
-        render_game_screen()
-
-    def render_start_screen():
-        page.overlay.clear()
-        page.clean()
-        def on_custom_click(e):
-            start_game_handler(e)
-        page.add(
-            ft.Container(
-                        content=ft.Column(
-                            [
-                                ft.Text("BALANCE GAME 🥴", size=60, color="white"),
-                                StyledButton()
-                                    .set_text("Начать игру", text_color=ft.Colors.BLACK, font_size=20)
-                                    .set_size(200, 60)
-                                    .set_style(ft.Colors.BLUE_GREY, border_radius=20)
-                                    .set_action(on_custom_click),
-                            ],
-                            alignment=ft.MainAxisAlignment.CENTER,
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                            expand=True
-                        ),
-                        alignment=ft.alignment.center_right,
-                        width=page.window_width,
-                        height=page.window_height,
-                    ),
-            )
-
-    def handle_pause(e):
-        nonlocal game_paused
-        game_paused = not game_paused
-        if game_paused:
-            render_pause_menu()
-        else:
-            page.overlay.clear()
-            page.update()
-
-    def render_pause_menu():
-        page.overlay.clear()
-        pause_menu = ft.Container(
-            content=ft.Column(
+                ft.Image(
+                    src="/Users/guguk/Documents/Lebedev-Projects/Summer Practice 1 course/bg.jpg",  # Путь к изображению
+                    fit=ft.ImageFit.COVER,  # Растянуть изображение
+                    width=page.window.width,
+                    height=page.window.height,
+                ),
+                ft.Row(
                 [
-                    ft.Text("Игра на паузе! Отдохни :)", size=25, color="white"),
-                    ft.ElevatedButton("Продолжить игру", on_click=handle_pause),
-                    ft.ElevatedButton("Музыка: Вкл/Выкл", on_click=lambda e: print("Музыка переключена")),
-                    ft.ElevatedButton("Выйти", on_click=lambda e: render_start_screen()),
+                    ft.Text(
+                        "Image title",
+                        color=ft.Colors.ON_SURFACE,
+                        size=20,
+                        weight=ft.FontWeight.BOLD,  
+                        text_align=ft.alignment.top_center,     
+                    )
                 ],
-                tight=True,
-                alignment=ft.MainAxisAlignment.CENTER,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                left = page.window.width / 2,  # Центрирование по горизонтали
+                top = page.window.height / 2,  # Центрирование по вертикали 
+                expand=True,  # Контейнер займет все доступное пространство  
+                vertical_alignment=  ft.alignment.top_center,  # Центрирование по вертикали
+                alignment=ft.alignment.top_center,  # Центрирование по горизонтали
             ),
-            bgcolor=ft.Colors.BLACK87,
-            padding=30,
-            border_radius=10,
-            alignment=ft.alignment.center,
+        ],
         )
-        page.overlay.append(pause_menu)
-        page.update()
+        
+    )
 
-    def render_game_screen():
-        pause_button = ft.IconButton(icon=ft.Icons.PAUSE, on_click=handle_pause)
-
-        page.add(
-            ft.Stack(
-                [
-                    ft.Row([pause_button], alignment=ft.MainAxisAlignment.END),
-                ]
-            )
-        )
-
-    render_start_screen()
+    page.update()
 
 ft.app(main)
