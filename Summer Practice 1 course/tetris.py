@@ -7,6 +7,17 @@ import json
 import TetrisAPI  # type: ignore
 
 pygame.init()
+pygame.mixer.init()
+
+# Загрузка музыки
+try:
+    pygame.mixer.music.load(os.path.join('music', 'music.mp3'))
+    pygame.mixer.music.set_volume(0.15)  # Начальная громкость 15%
+    pygame.mixer.music.play(-1)  # -1 означает бесконечное повторение
+    MUSIC_PLAYING = True
+except pygame.error as e:
+    print(f"Музыку меняй, абас!!: {e}")
+    MUSIC_PLAYING = False
 
 """работа с окнами чтобы было красиво"""
 WINDOW_WIDTH = 800
@@ -20,8 +31,10 @@ GRID_TOP_MARGIN = 30
 FIELD_WIDTH = int(WINDOW_WIDTH * 0.6)
 GRID_SIZE = FIELD_WIDTH // GRID_WIDTH
 
-"""фигуры падают каждые 350 миллисекунд"""
-FALL_SPEED = 350
+"""фигуры падают с изменяемой скоростью"""
+BASE_FALL_SPEED = 350  # базовая скорость падения в миллисекундах
+POINTS_PER_LEVEL = 500  # очки для перехода на следующий уровень
+SPEED_INCREASE = 0.2  # увеличение коэффициента скорости на уровень
 
 """ превью-окошко справа """
 NEXT_PIECES = 5   # количество следующих фигур для показа
@@ -219,6 +232,12 @@ class TetrisGame:
         6: 'L'
     }
 
+    """вычисляет текущую скорость падения на основе очков"""
+    def get_current_fall_speed(self):
+        level = self.score // POINTS_PER_LEVEL  # определяем текущий уровень
+        speed_multiplier = 1.0 + (level * SPEED_INCREASE)  # вычисляем множитель скорости
+        return int(BASE_FALL_SPEED / speed_multiplier)  # возвращаем текущую скорость падения
+
     """инициализация игры и всё что с ней"""
     def __init__(self):
         self.board = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
@@ -228,6 +247,13 @@ class TetrisGame:
         self.score = 0
         self.game_over = False
         self.rotation = 0  # поле для отслеживания поворота
+        # тслеживание времени для быстрого движения
+        self.last_move_time = {
+            'left': 0,
+            'right': 0,
+            'down': 0
+        }
+        self.move_delay = 0
         self.generate_new_pieces()
 
     """генерирует новую последовательность фигур"""
@@ -317,8 +343,9 @@ class TetrisGame:
             return
 
         current_time = pygame.time.get_ticks()
+        current_fall_speed = self.get_current_fall_speed()
         
-        if current_time - self.last_fall_time > FALL_SPEED:
+        if current_time - self.last_fall_time > current_fall_speed:
             if self.can_move(0, 1):
                 self.current_piece['y'] += 1
             else:
@@ -437,12 +464,51 @@ class TetrisGame:
                     pygame.draw.rect(surface, color, rect)
                     pygame.draw.rect(surface, BLACK, rect, 1)
 
+"""класс слайдера громкости"""
+class VolumeSlider:
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.knob_rect = pygame.Rect(x, y, 10, height)
+        self.dragging = False
+        self.value = pygame.mixer.music.get_volume()
+        self.update_knob_position()
+    
+    def update_knob_position(self):
+        self.knob_rect.x = self.rect.x + (self.rect.width - self.knob_rect.width) * self.value
+    
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                self.dragging = True
+                # Обновляем значение при клике
+                self.value = (event.pos[0] - self.rect.x) / self.rect.width
+                self.value = max(0, min(1, self.value))
+                self.update_knob_position()
+                pygame.mixer.music.set_volume(self.value)
+                
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.dragging = False
+            
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            self.value = (event.pos[0] - self.rect.x) / self.rect.width
+            self.value = max(0, min(1, self.value))
+            self.update_knob_position()
+            pygame.mixer.music.set_volume(self.value)
+    
+    def draw(self, surface):
+        pygame.draw.rect(surface, GRAY, self.rect)
+        pygame.draw.rect(surface, BUTTON_BG, self.knob_rect)
+        pygame.draw.rect(surface, BLACK, self.rect, 2)
+        pygame.draw.rect(surface, BLACK, self.knob_rect, 1)
+
 """класс меню паузы и его функции"""
 class PauseMenu:
     def __init__(self):
         self.is_visible = False
         
         # кнопки меню
+        self.music_on_button = Button("Музыка ВКЛ.", BUTTON_BG, menu_font)
+        self.music_off_button = Button("Музыка ВЫКЛ.", BUTTON_BG, menu_font)
         self.resume_button = Button("продолжить игру (нада)", BUTTON_BG, menu_font)
         self.restart_button = Button("начать игру заново (норм идея)", BUTTON_BG, menu_font)
         self.exit_button = Button("выйти из игры (ненада)", BUTTON_BG, menu_font)
@@ -450,24 +516,70 @@ class PauseMenu:
         self.menu_text = Button("Меню", DARK_ORANGE, menu_font, is_rounded=False)
         self.menu_button = Button("⋮", DARK_ORANGE, font, is_rounded=True, padding=(15, 5))
         
+        # слайдер громкости
+        slider_width = 200
+        self.volume_slider = VolumeSlider(
+            WINDOW_WIDTH//2 - slider_width//2,
+            WINDOW_HEIGHT//3 + 80,  # позиция под кнопками музыки
+            slider_width,
+            20
+        )
+        
         # позиционка кнопок
         self.menu_button.set_position(WINDOW_WIDTH - 60, 20)
         self.menu_text.set_position(WINDOW_WIDTH - 230, 20)
         
         button_y = WINDOW_HEIGHT // 3
-        self.resume_button.set_position(WINDOW_WIDTH // 2 - self.resume_button.width // 2, button_y)
-        self.restart_button.set_position(WINDOW_WIDTH // 2 - self.restart_button.width // 2, 
-                                      button_y + self.resume_button.height + 20)
-        self.exit_button.set_position(WINDOW_WIDTH // 2 - self.exit_button.width // 2, 
-                                    button_y + self.resume_button.height * 2 + 40)
+        
+        # позиционируем кнопки музыки на одной строке
+        total_width = self.music_on_button.width + self.music_off_button.width + 20  # 20px между кнопками
+        music_buttons_x = WINDOW_WIDTH // 2 - total_width // 2
+        
+        self.music_on_button.set_position(music_buttons_x, button_y)
+        self.music_off_button.set_position(
+            music_buttons_x + self.music_on_button.width + 20,
+            button_y
+        )
+        
+        # остальные кнопки идут ниже слайдера
+        main_buttons_y = button_y + 120  # отступ после слайдера
+        self.resume_button.set_position(
+            WINDOW_WIDTH // 2 - self.resume_button.width // 2,
+            main_buttons_y
+        )
+        self.restart_button.set_position(
+            WINDOW_WIDTH // 2 - self.restart_button.width // 2,
+            main_buttons_y + self.resume_button.height + 20
+        )
+        self.exit_button.set_position(
+            WINDOW_WIDTH // 2 - self.exit_button.width // 2,
+            main_buttons_y + self.resume_button.height * 2 + 40
+        )
 
     """обработка событий меню паузы"""
     def handle_events(self, event):
+        global MUSIC_PLAYING
+        
         if not self.is_visible and self.menu_button.handle_event(event):
             self.is_visible = True
             return "pause"
             
         if self.is_visible:
+            # обработка кнопок музыки
+            if self.music_on_button.handle_event(event):
+                if not MUSIC_PLAYING:
+                    pygame.mixer.music.unpause()
+                    MUSIC_PLAYING = True
+            
+            elif self.music_off_button.handle_event(event):
+                if MUSIC_PLAYING:
+                    pygame.mixer.music.pause()
+                    MUSIC_PLAYING = False
+            
+            # обработка слайдера
+            self.volume_slider.handle_event(event)
+            
+            # обработка основных кнопок меню
             if self.resume_button.handle_event(event):
                 self.is_visible = False
                 return "resume"
@@ -480,7 +592,6 @@ class PauseMenu:
 
     """отрисовка меню паузы"""
     def draw(self, surface):
-
         self.menu_text.draw(surface)
         self.menu_button.draw(surface)
         
@@ -490,7 +601,14 @@ class PauseMenu:
             pygame.draw.rect(s, MENU_BG, s.get_rect())
             surface.blit(s, (0,0))
             
-            # рисуем элементы меню
+            # рисуем кнопки управления музыкой
+            self.music_on_button.draw(surface)
+            self.music_off_button.draw(surface)
+            
+            # рисуем слайдер громкости
+            self.volume_slider.draw(surface)
+            
+            # рисуем основные элементы меню
             self.resume_button.draw(surface)
             self.restart_button.draw(surface)
             self.exit_button.draw(surface)
@@ -519,6 +637,8 @@ def main_menu():
             
             play_button.handle_event(event)
             if event.type == pygame.MOUSEBUTTONDOWN and play_button.is_hovered:
+                if MUSIC_PLAYING:
+                    pygame.mixer.music.set_volume(0.35)  # Увеличиваем громкость до 35%
                 game_loop()
         
         title_button.draw(screen)
@@ -545,27 +665,44 @@ def game_loop():
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-
                 if event.key == pygame.K_ESCAPE:
                     save_high_score(max(high_score, game.score))
                     return  # возврат в мэйн меню
                 
                 elif not game_paused:
-                    if event.key in [pygame.K_LEFT, pygame.K_a]:
-                        if game.can_move(-1, 0):
-                            game.current_piece['x'] -= 1
-                    elif event.key in [pygame.K_RIGHT, pygame.K_d]:
-                        if game.can_move(1, 0):
-                            game.current_piece['x'] += 1
-                    elif event.key in [pygame.K_DOWN, pygame.K_s]:
-                        if game.can_move(0, 1):
-                            game.current_piece['y'] += 1
-                    elif event.key in [pygame.K_UP, pygame.K_w]:
+                    if event.key in [pygame.K_UP, pygame.K_w]:
                         # квадрату вертеться нельзя
                         if game.current_piece['type'] != 'O':
                             new_rotation = (game.current_piece['rotation'] + 1) % 4
                             if game.can_move(0, 0, new_rotation):
                                 game.current_piece['rotation'] = new_rotation
+
+            # обработка зажатых клавиш
+            if not game_paused and not game.game_over:
+
+                keys = pygame.key.get_pressed()
+                current_time = pygame.time.get_ticks()
+                
+                # Движение влево (A или стрелка влево)
+                if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+                    if current_time - game.last_move_time['left'] > game.move_delay:
+                        if game.can_move(-1, 0):
+                            game.current_piece['x'] -= 1
+                            game.last_move_time['left'] = current_time
+                
+                # Движение вправо (D или стрелка вправо)
+                if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+                    if current_time - game.last_move_time['right'] > game.move_delay:
+                        if game.can_move(1, 0):
+                            game.current_piece['x'] += 1
+                            game.last_move_time['right'] = current_time
+                
+                # Ускоренное падение (S или стрелка вниз)
+                if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+                    if current_time - game.last_move_time['down'] > game.move_delay:
+                        if game.can_move(0, 1):
+                            game.current_piece['y'] += 1
+                            game.last_move_time['down'] = current_time
             
             # события меню паузы
             menu_action = pause_menu.handle_events(event)
