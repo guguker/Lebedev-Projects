@@ -533,31 +533,47 @@ class PauseMenu:
         self.menu_button.set_position(WINDOW_WIDTH - 60, 20)
         self.menu_text.set_position(WINDOW_WIDTH - 230, 20)
         
-        button_y = WINDOW_HEIGHT // 3
+        start_y = WINDOW_HEIGHT // 3
+        button_spacing = 20  # стандартный отступ между элементами
         
-        # позиционируем кнопки музыки на одной строке
-        total_width = self.music_on_button.width + self.music_off_button.width + 20  # 20px между кнопками
-        music_buttons_x = WINDOW_WIDTH // 2 - total_width // 2
-        
-        self.music_on_button.set_position(music_buttons_x, button_y)
-        self.music_off_button.set_position(
-            music_buttons_x + self.music_on_button.width + 20,
-            button_y
+        # Музыка ВКЛ (самая верхняя и дальше по списку чтоб красево!!)
+        self.music_on_button.set_position(
+            WINDOW_WIDTH // 2 - self.music_on_button.width // 2,
+            start_y
+        )
+
+        self.volume_slider = VolumeSlider(
+            WINDOW_WIDTH//2 - 200//2,  # 200 - ширина слайдера
+            start_y + self.music_on_button.height + button_spacing,
+            200,
+            20
         )
         
-        # остальные кнопки идут ниже слайдера
-        main_buttons_y = button_y + 120  # отступ после слайдера
+        self.music_off_button.set_position(
+            WINDOW_WIDTH // 2 - self.music_off_button.width // 2,
+            start_y + self.music_on_button.height + button_spacing + self.volume_slider.rect.height + button_spacing
+        )
+        
+        visual_gap = 75
+        
+        # основные кнопки меню (после отступа)
+        next_y = start_y + self.music_on_button.height + button_spacing + \
+                self.volume_slider.rect.height + button_spacing + \
+                self.music_off_button.height + visual_gap
+        
         self.resume_button.set_position(
             WINDOW_WIDTH // 2 - self.resume_button.width // 2,
-            main_buttons_y
+            next_y
         )
+        
         self.restart_button.set_position(
             WINDOW_WIDTH // 2 - self.restart_button.width // 2,
-            main_buttons_y + self.resume_button.height + 20
+            next_y + self.resume_button.height + button_spacing
         )
+        
         self.exit_button.set_position(
             WINDOW_WIDTH // 2 - self.exit_button.width // 2,
-            main_buttons_y + self.resume_button.height * 2 + 40
+            next_y + self.resume_button.height * 2 + button_spacing * 2
         )
 
     """обработка событий меню паузы"""
