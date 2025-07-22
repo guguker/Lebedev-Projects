@@ -9,16 +9,6 @@ import TetrisAPI  # type: ignore
 pygame.init()
 pygame.mixer.init()
 
-# Загрузка музыки
-try:
-    pygame.mixer.music.load(os.path.join('music', 'music.mp3'))
-    pygame.mixer.music.set_volume(0.15)  # Начальная громкость 15%
-    pygame.mixer.music.play(-1)  # -1 означает бесконечное повторение
-    MUSIC_PLAYING = True
-except pygame.error as e:
-    print(f"Музыку меняй, абас!!: {e}")
-    MUSIC_PLAYING = False
-
 """работа с окнами чтобы было красиво"""
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 1000
@@ -55,6 +45,17 @@ DARK_ORANGE = (255, 140, 0)
 
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("TetRizz")
+
+"""работа с музыкой и вывод ошибки возможной"""
+try:
+    pygame.mixer.music.load(os.path.join('music', 'music.mp3'))
+    pygame.mixer.music.set_volume(0.15)
+    pygame.mixer.music.play(-1)  # -1 означает бесконечное повторение
+    MUSIC_PLAYING = True
+
+except pygame.error as e:
+    print(f"музыку меняй, абас!!: {e}")
+    MUSIC_PLAYING = False
 
 """работа с фонами и вывод ошибки возможной"""
 try:
@@ -207,12 +208,12 @@ class TetrisGame:
         'Z': [(-1,0), (0,0), (0,1), (1,1)]    # Z-фигура
     }
     
-    """повороты фигур кроме квадрата"""
+    """повороты фигур кроме квадрата (678 строчка примерно)"""
     def get_rotated_shape(self, shape, rotation):
         rotated = []
         for x, y in shape:
             for _ in range(rotation % 4):
-                x, y = -y, x  # Поворот на 90° против часовой стрелки
+                x, y = -y, x  # поворот на 90° против часовой стрелки
             rotated.append((x, y))
         return rotated
     
@@ -247,13 +248,13 @@ class TetrisGame:
         self.score = 0
         self.game_over = False
         self.rotation = 0  # поле для отслеживания поворота
-        # тслеживание времени для быстрого движения
+        # отслеживание времени для быстрого движения
         self.last_move_time = {
             'left': 0,
             'right': 0,
             'down': 0
         }
-        self.move_delay = 0
+        self.move_delay = 0 # задержка фигуры в ms
         self.generate_new_pieces()
 
     """генерирует новую последовательность фигур"""
@@ -338,6 +339,7 @@ class TetrisGame:
         if lines_cleared > 0:
             self.score += lines_cleared * 100
 
+    """обновление состояния игры (падение фигур, проверка на game over)"""
     def update(self):
         if self.game_over:
             return
@@ -473,14 +475,16 @@ class VolumeSlider:
         self.value = pygame.mixer.music.get_volume()
         self.update_knob_position()
     
+    """обновляет позицию ползунка"""
     def update_knob_position(self):
         self.knob_rect.x = self.rect.x + (self.rect.width - self.knob_rect.width) * self.value
     
+    """обрабатывает события мыши для слайдера"""
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
                 self.dragging = True
-                # Обновляем значение при клике
+
                 self.value = (event.pos[0] - self.rect.x) / self.rect.width
                 self.value = max(0, min(1, self.value))
                 self.update_knob_position()
@@ -638,7 +642,7 @@ def main_menu():
             play_button.handle_event(event)
             if event.type == pygame.MOUSEBUTTONDOWN and play_button.is_hovered:
                 if MUSIC_PLAYING:
-                    pygame.mixer.music.set_volume(0.35)  # Увеличиваем громкость до 35%
+                    pygame.mixer.music.set_volume(0.35)  # увеличиваем громкость до 35% когда ыфигра
                 game_loop()
         
         title_button.draw(screen)
