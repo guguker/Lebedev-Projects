@@ -1,3 +1,4 @@
+
 # FINAL STABLE
 
 import pygame
@@ -666,27 +667,119 @@ def main_menu():
         
         pygame.display.flip()
 
+def parse_input_line(line):
+    """
+    Парсит строку с координатами и состоянием кнопок в словарь.
+    
+    Пример входной строки:
+    "X:522 | Y:528 | ButtonJS: 0 | Button1:0 | Button2:0 | Button3:0 | Button4:0"
+    
+    Возвращает:
+    {
+        'X': 522,
+        'Y': 528,
+        'ButtonJS': 0,
+        'Button1': 0,
+        'Button2': 0,
+        'Button3': 0,
+        'Button4': 0
+    }
+    """
+    result = {}
+    parts = line.split(' | ')
+    
+    for part in parts:
+        if ':' in part:
+            key, value = part.split(':', 1)
+            result[key.strip()] = int(value.strip())
+    
+    return result
+
 """основной игровой цикл"""
 def game_loop():
+    import serial
+    import serial.tools.list_ports
+
+    # Инициализация Arduino
+    try:
+        arduino = serial.Serial('COM4', 9600)
+        print("Arduino подключен к COM4")
+    except serial.SerialException:
+        print("Ошибка: не удалось подключиться к Arduino на порту COM4")
+        arduino = None
+
     pause_menu = PauseMenu()
     game_paused = False
     high_score = load_high_score()
     game = TetrisGame()
-    
+
+    # Константы для джойстика
+    JOYSTICK_CENTER_X = 523
+    JOYSTICK_CENTER_Y = 529
+    JOYSTICK_THRESHOLD = 100  # Порог для определения движения
+    last_joystick_move = pygame.time.get_ticks()
+    JOYSTICK_DELAY = 100  # Задержка между движениями джойстика
+
     while True:
         if background:
             screen.blit(background, (0, 0))
         else:
             screen.fill(WHITE)
-        
+
+        # Обработка данных с Arduino
+        if arduino:
+            try:
+                if arduino.in_waiting:
+                    line = arduino.readline().decode('utf-8').strip()
+                    parts = parse_input_line(line)
+                    print(parts)
+                    x, y = parts["X"], parts["Y"]
+                    button1, button2, button3 = parts["Button1"], parts["Button2"], parts["Button3"]
+                    
+                    current_time = pygame.time.get_ticks()
+
+                    if not game_paused and not game.game_over:
+                        
+                        # Горизонтальное движение
+                        if abs(x - JOYSTICK_CENTER_X) > JOYSTICK_THRESHOLD and \
+                            current_time - last_joystick_move > JOYSTICK_DELAY:
+                            dx = 1 if x > JOYSTICK_CENTER_X else -1
+                            if game.can_move(dx, 0):
+                                game.current_piece['x'] += dx
+                                last_joystick_move = current_time
+                        
+                        # Ускоренное падение
+                        if y < JOYSTICK_CENTER_Y + JOYSTICK_THRESHOLD and \
+                            current_time - last_joystick_move > JOYSTICK_DELAY:
+                            if game.can_move(0, 1):
+                                game.current_piece['y'] += 1
+                                last_joystick_move = current_time
+                        
+                        # Поворот (кнопка 2)
+                        if button3 and game.current_piece['type'] != 'O':
+                            new_rotation = (game.current_piece['rotation'] + 1) % 4
+                            if game.can_move(0, 0, new_rotation):
+                                game.current_piece['rotation'] = new_rotation
+                                last_joystick_move = current_time
+
+                        
+            except serial.SerialException:
+                print("Ошибка при чтении данных с Arduino")
+                arduino = None
+
+        # Обработка событий Pygame
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 save_high_score(max(high_score, game.score))
+                if arduino:
+                    arduino.close()
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     save_high_score(max(high_score, game.score))
+                    if arduino:
+                        arduino.close()
                     return  # возврат в мэйн меню
                 
                 elif not game_paused:
@@ -765,4 +858,3 @@ def game_loop():
 
 if __name__ == "__main__":
     main_menu()
-
